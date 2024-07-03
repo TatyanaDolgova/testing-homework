@@ -1,5 +1,11 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { Provider } from "react-redux";
 import { MemoryRouter } from "react-router-dom";
 import { AxiosResponse } from "axios";
@@ -7,6 +13,7 @@ import { Application } from "../../src/client/Application";
 import { initStore } from "../../src/client/store";
 import { CartApi, ExampleApi } from "../../src/client/api";
 import { CartState, ProductShortInfo } from "../../src/common/types";
+import events from "@testing-library/user-event";
 
 const mockProducts: ProductShortInfo[] = [
   { id: 1, name: "Product 1", price: 1 },
@@ -34,12 +41,12 @@ class MockCartApi extends CartApi {
 }
 
 describe("Каталог", () => {
-  it("должен отображать товары, список которых приходит с сервера", async () => {
+  it("для каждого товара в каталоге отображается название, цена и ссылка на страницу с подробной информацией о товаре", async () => {
     const api = new MockApi("");
     const cartApi = new MockCartApi();
     const store = initStore(api, cartApi);
 
-    render(
+    const { container } = render(
       <MemoryRouter>
         <Provider store={store}>
           <Application />
@@ -47,13 +54,17 @@ describe("Каталог", () => {
       </MemoryRouter>
     );
 
-    fireEvent.click(screen.getByRole("link", { name: "Catalog" }));
+    await events.click(screen.getByRole("link", { name: "Catalog" }));
 
-    await waitFor(() => {
-      mockProducts.forEach((product) => {
-        expect(screen.getByText(product.name));
-        expect(screen.getByText(`$${product.price}`));
-      });
+    const productElements = container.querySelectorAll(".ProductItem");
+
+    mockProducts.forEach((product, index) => {
+      const productElement = productElements[index];
+      if (productElement instanceof HTMLElement) {
+        expect(within(productElement).getByText(product.name));
+        expect(within(productElement).getByText(`$${product.price}`));
+        expect(within(productElement).getByRole("link", { name: "Details" }));
+      }
     });
   });
 });
