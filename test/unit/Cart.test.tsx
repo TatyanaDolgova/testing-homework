@@ -1,15 +1,15 @@
 import React from "react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { Form, MemoryRouter, Route, Routes } from "react-router-dom";
 import { AxiosResponse } from "axios";
 import { CartApi, ExampleApi } from "../../src/client/api";
 import { CartState, Product, ProductShortInfo } from "../../src/common/types";
 import { initStore } from "../../src/client/store";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
-import { ProductDetails } from "../../src/client/components/ProductDetails";
 import events from "@testing-library/user-event";
 import { Cart } from "../../src/client/pages/Cart";
 import { Application } from "../../src/client/Application";
+import "@testing-library/jest-dom";
 
 const mockProductsShortInfo: ProductShortInfo[] = [
   { id: 1, name: "Product 1", price: 1 },
@@ -56,72 +56,120 @@ class MockCartApi extends CartApi {
 }
 
 describe("Корзина", () => {
-  it("содержимое корзины должно сохраняться между перезагрузками страницы", async () => {
+  it("должна рендерится", () => {
     const api = new MockApi("");
     const cartApi = new MockCartApi();
     const store = initStore(api, cartApi);
-
-    render(
-      <MemoryRouter initialEntries={["/product/1"]}>
-        <Provider store={store}>
-          <Routes>
-            <Route
-              path="/product/:id"
-              element={<ProductDetails product={mockProducts[0]} />}
-            />
-          </Routes>
-        </Provider>
-      </MemoryRouter>
-    );
-
-    await events.click(screen.getByRole("button", { name: "Add to Cart" }));
 
     render(
       <MemoryRouter initialEntries={["/cart"]}>
         <Provider store={store}>
-          <Routes>
-            <Route path="/cart" element={<Cart />} />
-          </Routes>
+          <Cart />
         </Provider>
       </MemoryRouter>
     );
-
-    const count = document.querySelector(".Cart-Count");
-    expect(count?.textContent).toEqual("1");
+    expect(screen.getByText("Shopping cart"));
   });
 
-  it("в шапке рядом со ссылкой на корзину должно отображаться количество не повторяющихся товаров в ней", async () => {
+  it("если корзина пустая, должна отображаться ссылка на каталог товаров", () => {
     const api = new MockApi("");
     const cartApi = new MockCartApi();
     const store = initStore(api, cartApi);
 
-    const { container, findByText } = render(
-      <MemoryRouter>
+    render(
+      <MemoryRouter initialEntries={["/cart"]}>
         <Provider store={store}>
-          <Application />
+          <Cart />
+        </Provider>
+      </MemoryRouter>
+    );
+    expect(screen.getByRole("link", { name: "catalog" }));
+  });
+
+  it('в корзине должна быть кнопка "очистить корзину", по нажатию на которую все товары должны удаляться', async () => {
+    const api = new MockApi("");
+    const cartApi = new CartApi();
+    const store = initStore(api, cartApi);
+
+    store.dispatch({
+      type: "ADD_TO_CART",
+      product: mockProducts[0],
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/cart"]}>
+        <Provider store={store}>
+          <Cart />
         </Provider>
       </MemoryRouter>
     );
 
-    await events.click(screen.getByRole("link", { name: "Catalog" }));
+    await events.click(screen.getByText("Clear shopping cart"));
+    expect(screen.getByText(/Cart is empty/i));
+  });
+});
 
-    const productElements = await waitFor(() =>
-      container.querySelectorAll(".ProductItem")
+describe("Компонент формы", () => {
+  it("Должно выводится сообщение если номер заполнен некоректно", async () => {
+    const api = new MockApi("");
+    const cartApi = new CartApi();
+    const store = initStore(api, cartApi);
+
+    store.dispatch({
+      type: "ADD_TO_CART",
+      product: mockProducts[0],
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/cart"]}>
+        <Provider store={store}>
+          <Cart />
+        </Provider>
+      </MemoryRouter>
     );
 
-    for (const [index, productElement] of productElements.entries()) {
-      const link = productElement.querySelector(".DetailsLink");
+    const nameInput = screen.getByLabelText(/name/i);
+    const phoneInput = screen.getByLabelText(/phone/i);
+    const addressInput = screen.getByLabelText(/address/i);
+    const submitButton = screen.getByText(/checkout/i);
 
-      if (link) {
-        await events.click(link);
+    fireEvent.change(nameInput, { target: { value: "Татьяна" } });
+    fireEvent.change(phoneInput, { target: { value: "invalid-phone" } });
+    fireEvent.change(addressInput, { target: { value: "Dvurechensk" } });
 
-        await waitFor(() => {
-          events.click(screen.getByRole("button", { name: "Add to Cart" }));
-        });
-        await events.click(screen.getByRole("link", { name: "Catalog" }));
-      }
-    }
+    await fireEvent.click(submitButton);
 
-    findByText("Cart (2)");
+    expect(
+      await screen.getByText(/please provide a valid phone/i)
+    ).toBeInTheDocument();
+  });
+
+  it("Отправка формы", async () => {
+    const api = new MockApi("");
+    const cartApi = new CartApi();
+    const store = initStore(api, cartApi);
+
+    render(
+      <MemoryRouter initialEntries={["/cart"]}>
+        <Provider store={store}>
+          <Cart />
+        </Provider>
+      </MemoryRouter>
+    );
+
+    const nameInput = screen.getByLabelText(/name/i);
+    const phoneInput = screen.getByLabelText(/phone/i);
+    const addressInput = screen.getByLabelText(/address/i);
+    const submitButton = screen.getByText(/checkout/i);
+
+    fireEvent.change(nameInput, { target: { value: "Татьяна" } });
+    fireEvent.change(phoneInput, { target: { value: "1234567890" } });
+    fireEvent.change(addressInput, { target: { value: "123 Main St" } });
+
+    fireEvent.click(submitButton);
+
+    expect(nameInput).not.toHaveClass("is-invalid");
+    expect(phoneInput).not.toHaveClass("is-invalid");
+    expect(addressInput).not.toHaveClass("is-invalid");
   });
 });

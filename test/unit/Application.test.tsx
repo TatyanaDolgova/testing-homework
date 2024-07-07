@@ -35,13 +35,30 @@ class MockCartApi extends CartApi {
 }
 
 describe("Проверка общих требований", () => {
+  it("Главная страница рендерится", () => {
+    const api = new MockApi("");
+    const cartApi = new MockCartApi();
+    const store = initStore(api, cartApi);
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Provider store={store}>
+          <Application />
+        </Provider>
+      </MemoryRouter>
+    );
+
+    expect(
+      screen.getByText("Welcome to Kogtetochka store!")
+    ).toBeInTheDocument();
+  });
   it("В шапке отображаются ссылки на страницы магазина", async () => {
     const api = new MockApi("");
     const cartApi = new MockCartApi();
     const store = initStore(api, cartApi);
 
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/"]}>
         <Provider store={store}>
           <Application />
         </Provider>
@@ -60,7 +77,7 @@ describe("Проверка общих требований", () => {
     const store = initStore(api, cartApi);
 
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/"]}>
         <Provider store={store}>
           <Application />
         </Provider>
@@ -85,7 +102,7 @@ describe("Проверка общих требований", () => {
     window.dispatchEvent(new Event("resize"));
 
     const { container } = render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/"]}>
         <Provider store={store}>
           <Application />
         </Provider>
@@ -114,7 +131,7 @@ describe("Проверка общих требований", () => {
     window.dispatchEvent(new Event("resize"));
 
     const { container } = render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/"]}>
         <Provider store={store}>
           <Application />
         </Provider>
